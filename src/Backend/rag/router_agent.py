@@ -6,64 +6,45 @@ load_dotenv()
 
 co = cohere.Client(os.getenv("COHERE_API_KEY"))
 
+VALID_SOURCES = {"pdf", "wiki", "docs"}
 
-def llm_route(question):
-    prompt = f"""
-You are an intelligent routing agent.
+def route(question: str) -> str:
+    """
+    Routes a question to the best knowledge source using the LLM.
+    Returns one of: 'pdf', 'wiki', 'docs'
+    """
+    prompt = f"""You are an intelligent routing agent.
 
 Choose the BEST source for answering the question.
 
 Sources:
-- pdf → research papers, transformers, attention, deep learning architectures
-- wiki → general explanations and definitions
-- docs → programming, tutorials, libraries (PyTorch, FastAPI)
+- pdf   → research papers, transformers, attention, deep learning architectures
+- wiki  → general explanations and definitions
+- docs  → programming, tutorials, libraries (PyTorch, FastAPI)
 
 Rules:
 - Return ONLY one word: pdf OR wiki OR docs
-- No explanation
+- No explanation, no punctuation
 
-Question:
-{question}
+Question: {question}
 """
-
     try:
         response = co.chat(
-            model="command-r",
+            model="command-r7b-12-2024",
             message=prompt,
             temperature=0
         )
 
         output = response.text.strip().lower()
 
-        if "pdf" in output:
-            return "pdf"
-        elif "wiki" in output:
-            return "wiki"
-        elif "docs" in output:
-            return "docs"
-        else:
-            return "docs"
+        # Extract the first valid token found in the response
+        for token in output.split():
+            if token in VALID_SOURCES:
+                return token
+
+        # Soft fallback if LLM returns something unexpected
+        return "docs"
 
     except Exception as e:
-        print("LLM Router error:", e)
+        print("Router error:", e)
         return "docs"
-
-
-def choose_source(question):
-    q = question.lower()
-
-    # RULES (High precision)
-    if "attention" in q or "transformer" in q:
-        return "pdf"
-
-    if "paper" in q or "research" in q:
-        return "pdf"
-
-    if "what is" in q or "define" in q:
-        return "wiki"
-
-    if "how to" in q or "use" in q or "code" in q:
-        return "docs"
-
-    # fallback to LLM
-    return llm_route(question)

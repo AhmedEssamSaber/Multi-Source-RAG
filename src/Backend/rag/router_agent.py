@@ -7,29 +7,63 @@ load_dotenv()
 co = cohere.Client(os.getenv("COHERE_API_KEY"))
 
 
-def choose_source(question):
-
+def llm_route(question):
     prompt = f"""
-        You are a router agent.
+You are an intelligent routing agent.
 
-        Decide which source should answer the question.
+Choose the BEST source for answering the question.
 
-        Sources:
-        - pdf: research papers
-        - wiki: general knowledge
-        - docs: technical documentation
+Sources:
+- pdf → research papers, transformers, attention, deep learning architectures
+- wiki → general explanations and definitions
+- docs → programming, tutorials, libraries (PyTorch, FastAPI)
 
-        Return only one word:
-        pdf
-        wiki
-        docs
+Rules:
+- Return ONLY one word: pdf OR wiki OR docs
+- No explanation
 
-        Question:
-            {question}
-    """
+Question:
+{question}
+"""
 
-    response = co.chat(message=prompt)
+    try:
+        response = co.chat(
+            model="command-r",
+            message=prompt,
+            temperature=0
+        )
 
-    source = response.text.strip().lower()
+        output = response.text.strip().lower()
 
-    return source
+        if "pdf" in output:
+            return "pdf"
+        elif "wiki" in output:
+            return "wiki"
+        elif "docs" in output:
+            return "docs"
+        else:
+            return "docs"
+
+    except Exception as e:
+        print("LLM Router error:", e)
+        return "docs"
+
+
+def choose_source(question):
+    q = question.lower()
+
+    # RULES (High precision)
+    if "attention" in q or "transformer" in q:
+        return "pdf"
+
+    if "paper" in q or "research" in q:
+        return "pdf"
+
+    if "what is" in q or "define" in q:
+        return "wiki"
+
+    if "how to" in q or "use" in q or "code" in q:
+        return "docs"
+
+    # fallback to LLM
+    return llm_route(question)

@@ -1,52 +1,42 @@
 import faiss
 import numpy as np
+import pickle
+import os
 
 from src.Backend.rag.embeddings import embed_text
-from src.Backend.rag.ingest import documents
 
-index = faiss.read_index("vector_store/index.faiss")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+VECTOR_STORE = os.path.join(BASE_DIR, "vector_store")
 
 
-# def retrieve(query, k=3):
+def retrieve(query, source, k=5):
 
-#     query_embedding = embed_text([query])[0]
+    index_path = os.path.join(VECTOR_STORE, f"{source}.faiss")
+    texts_path = os.path.join(VECTOR_STORE, f"{source}_texts.pkl")
 
-#     D, I = index.search(
-#         np.array([query_embedding]).astype("float32"),
-#         k
-#     )
-
-#     results = [documents[i] for i in I[0]]
-
-#     return results
-# import numpy as np
-# import faiss
-
-def retrieve(question, k=5):
-    
-    if not documents:
-        print("⚠️ Documents list is empty!")
+    if not os.path.exists(index_path):
+        print(f"Index not found: {source}")
         return []
 
-    
-    question_embedding = embed_text(question)
-
-    
-    I, D = index.search(np.array([question_embedding], dtype='float32'), k)
-    
-   
-    valid_indices = [i for i in I[0] if 0 <= i < len(documents)]
-    
-    
-    if not valid_indices:
-        print("⚠️ No matching documents found!")
+    if not os.path.exists(texts_path):
+        print(f"Texts not found: {source}")
         return []
 
-    
-    results = [documents[i] for i in valid_indices]
+    index = faiss.read_index(index_path)
+
+    with open(texts_path, "rb") as f:
+        documents = pickle.load(f)
+
+    query_embedding = embed_text([query])[0]
+
+    D, I = index.search(
+        np.array([query_embedding]).astype("float32"),
+        k
+    )
+
+    results = []
+    for i in I[0]:
+        if 0 <= i < len(documents):
+            results.append(documents[i])
 
     return results
-
-def embed_text(text):
-    
-    raise NotImplementedError("Implement embedding for the text using your model")

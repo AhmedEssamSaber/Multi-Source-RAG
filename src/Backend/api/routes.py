@@ -9,13 +9,16 @@ from src.Backend.rag.pipeline import rag_pipeline
 router = APIRouter()
 
 
-class Query(BaseModel):
+class ChatRequest(BaseModel):
     question: str
 
 
 @router.post("/chat")
-def chat(query: Query):
+def chat(request: ChatRequest):
 
-    answer = rag_pipeline(query.question)
+    source, answer = rag_pipeline(request.question)
 
-    return {"answer": answer}
+    return {
+        "answer": answer,
+        "source": source
+    }

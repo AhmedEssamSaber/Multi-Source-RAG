@@ -1,0 +1,26 @@
+PyTorch is an open-source deep learning framework developed by Meta AI.
+
+It is widely used for building and training neural networks. PyTorch provides
+a flexible and dynamic computational graph, which allows developers to modify
+the network architecture during runtime.
+
+Key features of PyTorch include:
+
+1. Tensors:
+PyTorch tensors are similar to NumPy arrays but can run on GPUs to accelerate
+computations.
+
+2. Automatic differentiation:
+PyTorch uses a system called Autograd to automatically compute gradients,
+which are required for training neural networks using backpropagation.
+
+3. Neural network modules:
+PyTorch provides the torch.nn module that includes layers, loss functions,
+and utilities to build deep learning models.
+
+Example:
+Creating a tensor in PyTorch:
+
+import torch
+x = torch.tensor([1, 2, 3])
+print(x)

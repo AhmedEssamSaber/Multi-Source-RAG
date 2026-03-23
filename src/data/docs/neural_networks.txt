@@ -1,0 +1,21 @@
+A neural network is a machine learning model inspired by the human brain.
+
+It consists of layers of interconnected nodes called neurons. Each neuron
+receives input, performs a weighted sum, applies an activation function,
+and passes the result to the next layer.
+
+A typical neural network contains three main types of layers:
+
+1. Input layer
+2. Hidden layers
+3. Output layer
+
+Neural networks are trained using optimization algorithms such as
+gradient descent, which minimize a loss function.
+
+Applications of neural networks include:
+
+- Image recognition
+- Natural language processing
+- Speech recognition
+- Recommendation systems

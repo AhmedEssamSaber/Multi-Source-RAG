@@ -1,0 +1,20 @@
+Transformers are a type of neural network architecture introduced in the paper
+"Attention Is All You Need" in 2017.
+
+Unlike traditional recurrent neural networks (RNNs), transformers process
+entire sequences in parallel, which allows them to train much faster on large
+datasets.
+
+The core component of a transformer is the attention mechanism, specifically
+self-attention. Self-attention allows the model to focus on different parts of
+the input sequence when computing representations.
+
+Key components of the transformer architecture include:
+
+1. Self-attention layers
+2. Feed-forward neural networks
+3. Positional encoding
+4. Multi-head attention
+
+Transformers are widely used in natural language processing tasks such as
+machine translation, text summarization, and question answering.

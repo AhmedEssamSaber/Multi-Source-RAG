@@ -12,7 +12,7 @@ def rag_pipeline(question):
     # Step 2: retrieve
     docs = retrieve(question, source=source)
 
-    # Step 3: fallback لو فاضي
+    # Step 3: fallback 
     if not docs:
         print("Fallback to other sources...")
 

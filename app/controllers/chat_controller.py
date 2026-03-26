@@ -18,9 +18,9 @@ class ChatResponse(BaseModel):
 
 
 @router.post("/chat", response_model=ChatResponse)
-def chat(req: ChatRequest):
+async def chat(req: ChatRequest):
 
-    source, answer = rag.run(req.question)
+    source, answer = await rag.run(req.question)
 
     return {
         "answer": answer,
@@ -28,5 +28,5 @@ def chat(req: ChatRequest):
     }
 
 @router.get("/sources")
-def get_sources():
+async def get_sources():
     return [s.value for s in SourceType]

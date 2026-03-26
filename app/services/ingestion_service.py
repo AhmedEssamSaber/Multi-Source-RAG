@@ -2,10 +2,34 @@ import os
 import faiss
 import numpy as np
 import pickle
+import re
 
 from app.models.loader_model import DocumentLoader
 from app.models.chunking_model import TextChunker
 from app.models.embedding_model import EmbeddingModel
+
+from app.models.db.database import AsyncSessionLocal
+
+from app.models.repositories.document_repository import DocumentRepository
+from app.models.repositories.chunk_repository import ChunkRepository
+from app.models.repositories.embedding_repository import EmbeddingRepository
+
+
+# CLEAN FUNCTION 
+def clean_text(text: str) -> str:
+    if not text:
+        return ""
+
+    # remove null bytes
+    text = text.replace("\x00", "")
+
+    # remove weird unicode chars
+    text = re.sub(r"[^\x00-\x7F]+", " ", text)
+
+    # remove extra spaces
+    text = re.sub(r"\s+", " ", text)
+
+    return text.strip()
 
 
 class IngestionService:
@@ -15,76 +39,125 @@ class IngestionService:
         self.chunker = TextChunker()
         self.embedder = EmbeddingModel()
 
-        self.base_dir = os.path.abspath(".")
+        # (fix path)
+        self.base_dir = os.path.dirname(os.path.dirname(__file__))
         self.data_path = os.path.join(self.base_dir, "data")
         self.vector_store = os.path.join(self.base_dir, "vector_store")
 
+    
+    # LOAD DOCUMENTS
     def load_documents(self, source):
 
         texts = []
         source_path = os.path.join(self.data_path, source)
 
-        print(f"\n Scanning: {source_path}")
+        print(f"PATH: {source_path}")
 
         for root, _, files in os.walk(source_path):
+            print(f"FILES FOUND: {files}")
 
             for file in files:
+
                 path = os.path.join(root, file)
+                print(f"Reading file: {path}")
 
-                if file.lower().endswith(".pdf"):
+                # load file
+                if file.endswith(".pdf"):
                     text = self.loader.load_pdf(path)
-
-                elif file.lower().endswith(".txt"):
+                else:
                     text = self.loader.load_txt(path)
 
-                else:
+                if not text:
+                    print(f"Empty file: {file}")
                     continue
 
-                if not text:
-                    continue
+                # CLEAN TEXT BEFORE CHUNKING
+                text = clean_text(text)
 
                 chunks = self.chunker.chunk(text)
 
-                texts.extend(chunks)
+                texts.extend([(file, chunk) for chunk in chunks])
 
+        print(f"TOTAL CHUNKS: {len(texts)}")
         return texts
 
-    def ingest(self):
+    
+    # INGEST
+    async def ingest(self):
 
         os.makedirs(self.vector_store, exist_ok=True)
 
-        sources = ["docs", "pdf", "wiki"]
+        async with AsyncSessionLocal() as session:
 
-        for source in sources:
+            doc_repo = DocumentRepository(session)
+            chunk_repo = ChunkRepository(session)
+            emb_repo = EmbeddingRepository(session)
 
-            print(f"\n Processing: {source}")
+            sources = ["docs", "pdf", "wiki"]
 
-            texts = self.load_documents(source)
+            for source in sources:
 
-            if not texts:
-                print(f"No docs in {source}")
-                continue
+                print(f"\n Processing: {source}")
 
-            embeddings = self.embedder.embed(texts)
+                texts = self.load_documents(source)
 
-            dimension = len(embeddings[0])
+                if not texts:
+                    print("No data found")
+                    continue
 
-            index = faiss.IndexFlatL2(dimension)
-            index.add(np.array(embeddings).astype("float32"))
+                file_names = [t[0] for t in texts]
+                chunks = [t[1] for t in texts]
 
-            # save index
-            faiss.write_index(
-                index,
-                os.path.join(self.vector_store, f"{source}.faiss")
-            )
+                # EMBEDDINGS
+                embeddings = self.embedder.embed(chunks)
 
-            # save texts
-            with open(
-                os.path.join(self.vector_store, f"{source}_texts.pkl"),
-                "wb"
-            ) as f:
-                pickle.dump(texts, f)
+                dimension = len(embeddings[0])
 
-            print(f"✅ Saved {source}")
+                index = faiss.IndexFlatL2(dimension)
+                index.add(np.array(embeddings).astype("float32"))
 
-        print("\n Ingestion Done")
+                # save FAISS
+                faiss.write_index(
+                    index,
+                    os.path.join(self.vector_store, f"{source}.faiss")
+                )
+
+                with open(
+                    os.path.join(self.vector_store, f"{source}_texts.pkl"),
+                    "wb"
+                ) as f:
+                    pickle.dump(chunks, f)
+
+                print(f"FAISS saved for {source}")
+
+                # SAVE TO DATABASE
+                current_file = None
+                doc = None
+
+                for file_name, chunk_text, emb in zip(file_names, chunks, embeddings):
+
+                    # new document
+                    if file_name != current_file:
+                        doc = await doc_repo.create_document(source, file_name)
+                        doc.content = clean_text(chunk_text)
+                        current_file = file_name
+
+                    # clean chunk
+                    clean_chunk = clean_text(chunk_text)
+
+                    # create chunk
+                    chunk_obj = await chunk_repo.create_chunk(
+                        doc.id,
+                        clean_chunk
+                    )
+
+                    # create embedding
+                    await emb_repo.create_embedding(
+                        chunk_obj.id,
+                        emb
+                    )
+
+            # IMPORTANT
+            await session.commit()
+
+        print("\n Hybrid Ingestion Done")

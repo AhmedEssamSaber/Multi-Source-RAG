@@ -3,6 +3,9 @@ from app.services.retriever_service import RetrieverService
 from app.services.generator_service import GeneratorService
 from app.core.enums import SourceType
 
+from app.models.repositories.query_log_repository import QueryLogRepository
+from app.models.db.database import AsyncSessionLocal
+
 
 class RAGService:
 
@@ -11,7 +14,8 @@ class RAGService:
         self.retriever = RetrieverService()
         self.generator = GeneratorService()
 
-    def run(self, question: str):
+    
+    async def run(self, question: str):
 
         source = self.router.route(question)
 
@@ -34,10 +38,21 @@ class RAGService:
                     break
 
         if not docs:
-            return source.value, "No documents found."
+            answer = "No documents found."
+        else:
+            context = "\n".join(docs)
+            answer = self.generator.generate(question, context)
 
-        context = "\n".join(docs)
+        
+        async with AsyncSessionLocal() as session:
+            log_repo = QueryLogRepository(session)
 
-        answer = self.generator.generate(question, context)
+            await log_repo.create_log(
+                question=question,
+                answer=answer,
+                source=source.value
+            )
+
+            await session.commit()
 
         return source.value, answer

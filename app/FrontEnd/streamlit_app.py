@@ -1,41 +1,73 @@
 import streamlit as st
 import requests
 
-#  Page Config
-st.set_page_config(
-    page_title="AI Knowledge Chatbot",
-    page_icon="🤖",
-    layout="centered"
-)
+st.set_page_config(page_title="RAG Chatbot", layout="wide")
 
-st.title("🤖 AI Knowledge Chatbot")
+st.title("🤖 RAG Chatbot")
 
-# Input
-question = st.text_input("Ask a question")
 
-# Button
-if st.button("Send"):
+# SESSION STATE INIT
 
-    if not question.strip():
-        st.warning("Please enter a question.")
+if "history" not in st.session_state:
+    st.session_state.history = []
+
+
+# SIDEBAR (HISTORY)
+
+st.sidebar.title("🧠 Previous Questions")
+
+for i, item in enumerate(st.session_state.history):
+    if st.sidebar.button(item["question"], key=i):
+        st.session_state.selected = item
+
+
+# MAIN INPUT
+
+question = st.text_input("Enter your question:")
+
+if st.button("Ask"):
+
+    if not question:
+        st.warning("Please enter a question")
     else:
-        with st.spinner("Thinking... 🤔"):
+        with st.spinner("Thinking..."):
 
-            try:
-                response = requests.post(
-                    "http://localhost:8000/chat",
-                    json={"question": question}
-                )
+            response = requests.post(
+                "http://127.0.0.1:8000/chat",
+                json={"question": question}
+            )
 
+            if response.status_code == 200:
                 data = response.json()
 
-                # Source
-                st.markdown(f"### 🧠 Source: `{data['source']}`")
+                answer = data["answer"]
+                source = data["source"]
 
-                # Answer
-                st.markdown("### 🤖 Answer:")
-                st.write(data.get("answer", "No answer returned."))
+                
+                st.session_state.history.append({
+                    "question": question,
+                    "answer": answer,
+                    "source": source
+                })
 
-            except Exception as e:
-                st.error("Failed to connect to backend.")
-                st.text(str(e))
+                st.session_state.selected = {
+                    "question": question,
+                    "answer": answer,
+                    "source": source
+                }
+
+            else:
+                st.error("Error connecting to API")
+
+
+# DISPLAY SELECTED CHAT
+
+if "selected" in st.session_state:
+
+    st.subheader("📝 Question")
+    st.write(st.session_state.selected["question"])
+
+    st.subheader("💡 Answer")
+    st.write(st.session_state.selected["answer"])
+
+    st.info(f"Source: {st.session_state.selected['source']}")

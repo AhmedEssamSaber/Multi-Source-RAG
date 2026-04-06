@@ -62,7 +62,7 @@ graph TD
 ## System Preview
 
 ### 🖥️ Streamlit UI
-![UI](<images/Streamlit/q4.png>)
+![UI](<images/Streamlit/q5.png>)
 
 
 ### 🗄️ Database (PostgreSQL)

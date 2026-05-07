@@ -2,7 +2,6 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.services.rag_service import RAGService
-from app.core.enums import SourceType
 
 router = APIRouter()
 rag = RAGService()
@@ -10,23 +9,22 @@ rag = RAGService()
 
 class ChatRequest(BaseModel):
     question: str
+    session_id: str
 
 
-class ChatResponse(BaseModel):
-    answer: str
-    source: str
+@router.post("/chat")
+async def chat(request: ChatRequest):
 
-
-@router.post("/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest):
-
-    source, answer = await rag.run(req.question)
+    source, answer = await rag.run(
+        question=request.question,
+        session_id=request.session_id
+    )
 
     return {
         "answer": answer,
         "source": source
     }
 
-@router.get("/sources")
-async def get_sources():
-    return [s.value for s in SourceType]
+@router.get("/")
+async def root():
+    return {"message": "Welcome to the Multi-Source RAG API!"}

@@ -71,6 +71,9 @@ graph TD
 
 ### 🖥️ Streamlit UI
 ![UI](<images/Streamlit/Q5.png>)
+=======
+![UI](<images/Streamlit/q5.png>)
+
 
 
 ### 🗄️ Database (PostgreSQL)

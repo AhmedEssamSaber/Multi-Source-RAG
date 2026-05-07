@@ -1,18 +1,21 @@
+from app.models.db.models import QueryLog
+
+
 class QueryLogRepository:
 
     def __init__(self, session):
         self.session = session
 
-    async def create_log(self, question, answer, source):
-        from app.models.db.models.query_log import QueryLog
+    async def create_log(self, question, answer, source, session_id):
 
-        log = QueryLog(
+        new_log = QueryLog(
             question=question,
             answer=answer,
-            source=source
+            source=source,
+            session_id=session_id 
         )
 
-        self.session.add(log)
+        self.session.add(new_log)
         await self.session.flush()
 
-        return log
+        return new_log

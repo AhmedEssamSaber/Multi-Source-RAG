@@ -1,6 +1,8 @@
-## Multi-Source Agentic RAG System
+## Multi-Source RAG System
 
-This project is an end-to-end Retrieval-Augmented Generation (RAG) system that integrates multiple data sources and uses vector search + LLMs to generate accurate answers.
+This project is an end-to-end Retrieval-Augmented Generation (RAG) system that retrieves information from multiple data sources including documents, PDFs, and Wikipedia content. The system uses semantic search with vector embeddings and Large Language Models (LLMs) to generate accurate, context-aware answers.
+
+The pipeline includes document ingestion, text chunking, embedding generation, vector storage using FAISS, intelligent retrieval, reranking, and answer generation through LLMs. The system also supports query logging, source routing, and an interactive Streamlit interface for user interaction.
 
 
 # system architecture diagram
@@ -8,53 +10,59 @@ This project is an end-to-end Retrieval-Augmented Generation (RAG) system that i
 graph TD
 
     USER((User))
-    API[FastAPI]
+    API[FastAPI API]
 
     USER --> API
 
     subgraph RAG_System
         RAG[RAG Service]
-        ROUTER[Router]
-        RETRIEVER[Retriever]
-        GENERATOR[Generator]
 
-        RAG --> ROUTER
+        RETRIEVER[Hybrid Retriever]
+        GENERATOR[Generator Service]
+
         RAG --> RETRIEVER
         RAG --> GENERATOR
     end
 
     API --> RAG
 
-    subgraph Data
+    subgraph Data_Sources
         DOCS[Docs]
         PDF[PDF]
         WIKI[Wiki]
     end
 
-    ROUTER --> DOCS
-    ROUTER --> PDF
-    ROUTER --> WIKI
+    RETRIEVER --> DOCS
+    RETRIEVER --> PDF
+    RETRIEVER --> WIKI
 
     subgraph Storage
+        VECTOR[(FAISS Vector Store)]
         DB[(PostgreSQL)]
-        VECTOR[(FAISS)]
     end
 
     RETRIEVER --> VECTOR
-    VECTOR --> DB
+    RETRIEVER --> DB
 
-    subgraph Model
+    subgraph Models
+        EMBED[Embedding Model]
         LLM[LLM]
     end
 
     GENERATOR --> LLM
 
-    subgraph Ingestion
-        INGEST[Loader -> Chunker -> Embedder]
+    subgraph Ingestion_Pipeline
+        LOADER[Document Loader]
+        CHUNKER[Text Chunker]
+        INGEST[Ingestion Service]
     end
 
-    INGEST --> DB
-    INGEST --> VECTOR
+    LOADER --> CHUNKER
+    CHUNKER --> EMBED
+    EMBED --> VECTOR
+    EMBED --> DB
+
+    INGEST --> LOADER
 
     GENERATOR --> API
 ```
@@ -62,14 +70,14 @@ graph TD
 ## System Preview
 
 ### 🖥️ Streamlit UI
-![UI](<images/Streamlit/q4.png>)
+![UI](<images/Streamlit/Q5.png>)
 
 
 ### 🗄️ Database (PostgreSQL)
-![DB](<images/Database/all question in db.png>)
+![DB](<images/Database/all query logs.png>)
 
 # Overview
-The system follows an Agentic RAG pipeline:
+The system follows an Multi-Source RAG pipeline:
 - Ingest data from multiple sources (Docs, PDF, Wiki)
 - Split into chunks
 - Generate embeddings
@@ -152,8 +160,15 @@ app/
 │   ├── ingestion_service.py      # Load → chunk → embed → store pipeline
 │   ├── retriever_service.py      # Retrieve relevant chunks
 │   ├── generator_service.py      # Generate answers using LLM
-│   ├── router_service.py         # Route query to best data source
 │   └── rag_service.py            # Main RAG orchestration logic
+│
+├──vector_store/                  
+│   ├── docs.faiss
+│   ├── docs_texts.pkl
+│   ├── wiki.faiss
+│   ├── wiki_texts.pkl
+│   ├── pdf.faiss
+│   └── pdf_texts.pkl
 │
 docker/
 │   ├── docker-compose.yml        # Multi-container setup (app + DB)
@@ -168,13 +183,20 @@ README.md                       # Project documentation
 ```
 
 # Features
-- Multi-source RAG (Docs / PDF / Wiki)
-- FAISS vector search
-- Async PostgreSQL
-- Query logging system
-- Reranking (Top-K → Best-K)
-- Streamlit UI with chat history
-
+- Multi-source retrieval (docs, pdf, wiki)
+- Semantic search using vector embeddings
+- FAISS-based vector database
+- Intelligent document retrieval and reranking
+- LLM-based answer generation
+- FastAPI backend API
+- Streamlit frontend interface
+- PostgreSQL database integration
+- Modular and scalable architecture
+- Docker support for deployment
+- Hybrid retrieval pipeline
+- Context reranking using cosine similarity
+- Multi-source semantic retrieval
+- Query logging and monitoring
 
 # Database Schema
 - documents
@@ -186,8 +208,8 @@ README.md                       # Project documentation
 | Metric      | Count |
 |-------------|-------|
 | Documents   | 8     |
-| Chunks      | 774   |
-| Embeddings  | 774   |
+| Chunks      | 788   |
+| Embeddings  | 788   |
 
 # Why This Project Matters
 

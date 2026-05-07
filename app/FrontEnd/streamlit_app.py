@@ -1,73 +1,106 @@
 import streamlit as st
 import requests
+import uuid
 
 st.set_page_config(page_title="RAG Chatbot", layout="wide")
 
 st.title("🤖 RAG Chatbot")
 
-
 # SESSION STATE INIT
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
 
 if "history" not in st.session_state:
     st.session_state.history = []
 
+# CLEAN FUNCTION (IMPORTANT)
+def clean_answer(text):
+    unwanted = [
+        "Based on the context provided,",
+        "Based on the provided context,",
+        "Based on the context,",
+        "According to the context,"
+    ]
 
-# SIDEBAR (HISTORY)
+    for u in unwanted:
+        text = text.replace(u, "")
 
-st.sidebar.title("🧠 Previous Questions")
+    return text.strip()
 
-for i, item in enumerate(st.session_state.history):
-    if st.sidebar.button(item["question"], key=i):
-        st.session_state.selected = item
+# SIDEBAR
+st.sidebar.title("🧠 Chat History")
 
+# show history
+for i, item in enumerate(st.session_state.history[::-1]):
+    if st.sidebar.button(item["question"][:40], key=i):
+        st.session_state.messages = item["messages"]
 
-# MAIN INPUT
+st.sidebar.divider()
 
-question = st.text_input("Enter your question:")
+st.sidebar.write("Session ID:")
+st.sidebar.code(st.session_state.session_id)
 
-if st.button("Ask"):
+if st.sidebar.button("🗑️ Clear Chat"):
+    st.session_state.messages = []
 
-    if not question:
-        st.warning("Please enter a question")
-    else:
+# DISPLAY CHAT
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+        if msg["role"] == "assistant":
+            st.caption(f"📚 Source: {msg['source']}")
+
+# INPUT
+question = st.chat_input("Ask anything...")
+
+if question:
+
+    # save user msg
+    st.session_state.messages.append({
+        "role": "user",
+        "content": question
+    })
+
+    with st.chat_message("user"):
+        st.markdown(question)
+
+    # call backend
+    with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
 
             response = requests.post(
                 "http://127.0.0.1:8000/chat",
-                json={"question": question}
+                json={
+                    "question": question,
+                    "session_id": st.session_state.session_id
+                }
             )
 
             if response.status_code == 200:
                 data = response.json()
 
-                answer = data["answer"]
+                answer = clean_answer(data["answer"])  
                 source = data["source"]
 
-                
-                st.session_state.history.append({
-                    "question": question,
-                    "answer": answer,
+                st.markdown(answer)
+                st.caption(f"📚 Source: {source}")
+
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": answer,
                     "source": source
                 })
 
-                st.session_state.selected = {
+                # save in history
+                st.session_state.history.append({
                     "question": question,
-                    "answer": answer,
-                    "source": source
-                }
+                    "messages": st.session_state.messages.copy()
+                })
 
             else:
-                st.error("Error connecting to API")
+                st.error("API Error")
 
-
-# DISPLAY SELECTED CHAT
-
-if "selected" in st.session_state:
-
-    st.subheader("📝 Question")
-    st.write(st.session_state.selected["question"])
-
-    st.subheader("💡 Answer")
-    st.write(st.session_state.selected["answer"])
-
-    st.info(f"Source: {st.session_state.selected['source']}")

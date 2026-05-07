@@ -1,7 +1,5 @@
-from app.services.router_service import RouterService
 from app.services.retriever_service import RetrieverService
 from app.services.generator_service import GeneratorService
-from app.core.enums import SourceType
 
 from app.models.repositories.query_log_repository import QueryLogRepository
 from app.models.db.database import AsyncSessionLocal
@@ -10,49 +8,111 @@ from app.models.db.database import AsyncSessionLocal
 class RAGService:
 
     def __init__(self):
-        self.router = RouterService()
         self.retriever = RetrieverService()
         self.generator = GeneratorService()
 
-    
-    async def run(self, question: str):
+    # SIMPLE RULE-BASED ROUTING
+    def decide_sources(self, question: str):
+        q = question.lower()
 
-        source = self.router.route(question)
+        if any(w in q for w in ["pytorch", "tensorflow", "api", "install", "code"]):
+            return ["docs"]
 
-        docs = self.retriever.retrieve(question, source)
+        if any(w in q for w in ["paper", "research", "transformer", "attention"]):
+            return ["pdf"]
 
-        if not docs:
+        if any(w in q for w in ["what is", "define", "explain"]):
+            return ["wiki"]
 
-            fallback_map = {
-                SourceType.PDF:  [SourceType.WIKI, SourceType.DOCS],
-                SourceType.WIKI: [SourceType.PDF,  SourceType.DOCS],
-                SourceType.DOCS: [SourceType.WIKI, SourceType.PDF],
-            }
+        return ["docs", "wiki"]
 
-            for fallback in fallback_map[source]:
 
-                docs = self.retriever.retrieve(question, fallback)
+    def clean_answer(self, text):
+        bad_phrases = [
+            "based on the context",
+            "based on the provided context",
+            "according to the context"
+        ]
 
-                if docs:
-                    source = fallback
-                    break
+        text_lower = text.lower()
 
-        if not docs:
-            answer = "No documents found."
+        for phrase in bad_phrases:
+            if text_lower.startswith(phrase):
+                text = text[len(phrase):]
+
+        return text.strip()
+
+    async def run(self, question: str, session_id: str):
+
+        # GET HISTORY 
+        async with AsyncSessionLocal() as session:
+            log_repo = QueryLogRepository(session)
+
+            try:
+                history = await log_repo.get_last_messages(
+                    session_id=session_id,
+                    limit=3
+                )
+            except:
+                history = []
+
+        history_text = "\n".join([
+            f"User: {h.question}\nAssistant: {h.answer}"
+            for h in history
+        ])
+
+        # RETRIEVE
+        sources = self.decide_sources(question)
+
+        all_results = []
+
+        for src in sources:
+            docs = self.retriever.retrieve_from_source(question, src, k=5)
+
+            for d in docs:
+                all_results.append({
+                    "content": str(d),   
+                    "source": src
+                })
+
+        # FALLBACK
+        if not all_results:
+            docs = self.retriever.retrieve_all(question)
+
+            for d in docs:
+                all_results.append(d)
+
+        # GENERATION
+        if not all_results:
+            answer = "No relevant documents found."
+            source = "none"
         else:
-            context = "\n".join(docs)
-            answer = self.generator.generate(question, context)
+            context = "\n".join([r["content"] for r in all_results[:5]])
 
-        
+            print("\= DEBUG CONTEXT=\n")
+            print(context)
+            print("\=======\n")
+
+            answer = self.generator.generate(
+                question=question,
+                context=context
+            )
+
+            answer = self.clean_answer(answer)
+
+            source = list(set([r["source"] for r in all_results]))
+
+        # SAVE
         async with AsyncSessionLocal() as session:
             log_repo = QueryLogRepository(session)
 
             await log_repo.create_log(
                 question=question,
                 answer=answer,
-                source=source.value
+                source=",".join(source) if isinstance(source, list) else source,
+                session_id=session_id
             )
 
             await session.commit()
 
-        return source.value, answer
+        return source, answer

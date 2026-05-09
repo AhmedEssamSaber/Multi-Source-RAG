@@ -3,7 +3,7 @@ from app.controllers.chat_controller import router
 
 from app.models.db.database import init_db
 
-app = FastAPI(title="Multi Source Agentic RAG")
+app = FastAPI(title="Multi Source RAG")
 
 app.include_router(router)
 

@@ -16,5 +16,4 @@ networks:
   backend:
 
 volumes:
-  mongodata:
   pgvector_data:
